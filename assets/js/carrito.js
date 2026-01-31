@@ -176,15 +176,39 @@ function formatearCantidad(cantidad) {
 const solictarPedido = (codPedido) => {
   const whatsappAPI = "https://api.whatsapp.com/send?phone=";
   const phoneNumber = "+57xxxxxxxxxx";
-  const esUserId = /^[0-9]+$/.test(codPedido);
-  const link = esUserId
-    ? `http://localhost/tienda-online/pdfPedido.php?userId=${codPedido}`
-    : `http://localhost/tienda-online/pdfPedido.php?codPedido=${codPedido}`;
-  const message = `¡Hola! Me interesa el siguiente pedido: ${link}`;
-  const whatsappURL = `${whatsappAPI}${phoneNumber}&text=${message}`;
 
-  // Abrir la conversación de WhatsApp en una nueva ventana o pestaña
-  window.open(whatsappURL, "_blank");
+  let tokenCliente = "";
+  if ("miProducto" in localStorage) {
+    tokenCliente = localStorage.getItem("miProducto");
+  }
+
+  const dataString = `accion=finalizarPedido&tokenCliente=${tokenCliente}`;
+
+  axios
+    .post(ruta, dataString)
+    .then((response) => {
+      let link = "";
+      if (response.data && response.data.estado === "OK") {
+        link = `${window.location.origin}/pdfPedido.php?pedidoId=${response.data.pedidoId}`;
+      } else {
+        const esUserId = /^[0-9]+$/.test(codPedido);
+        link = esUserId
+          ? `${window.location.origin}/pdfPedido.php?userId=${codPedido}`
+          : `${window.location.origin}/pdfPedido.php?codPedido=${codPedido}`;
+      }
+      const message = `¡Hola! Me interesa el siguiente pedido: ${link}`;
+      const whatsappURL = `${whatsappAPI}${phoneNumber}&text=${message}`;
+      window.open(whatsappURL, "_blank");
+    })
+    .catch(() => {
+      const esUserId = /^[0-9]+$/.test(codPedido);
+      const link = esUserId
+        ? `${window.location.origin}/pdfPedido.php?userId=${codPedido}`
+        : `${window.location.origin}/pdfPedido.php?codPedido=${codPedido}`;
+      const message = `¡Hola! Me interesa el siguiente pedido: ${link}`;
+      const whatsappURL = `${whatsappAPI}${phoneNumber}&text=${message}`;
+      window.open(whatsappURL, "_blank");
+    });
 };
 
 /**

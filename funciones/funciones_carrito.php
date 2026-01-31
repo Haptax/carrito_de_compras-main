@@ -97,7 +97,7 @@ if (isset($_POST["accion"]) && $_POST["accion"] == "addCar") {
     }
 
     //Total carrito en el icono de compra
-    $SqlTotalProduct       = ("SELECT SUM(cantidad) AS totalProd FROM pedidostemporales WHERE " . $where . " GROUP BY " . $filtro['field'] . ");
+    $SqlTotalProduct       = ("SELECT SUM(cantidad) AS totalProd FROM pedidostemporales WHERE " . $where . " GROUP BY " . $filtro['field'] . "");
     $jqueryTotalProduct    = mysqli_query($con, $SqlTotalProduct);
     $DataTotalProducto     = mysqli_fetch_array($jqueryTotalProduct);
     echo $DataTotalProducto['totalProd'];
@@ -170,6 +170,72 @@ if (isset($_POST["accion"]) && $_POST["accion"] == "borrarproductoModal") {
         'estado' => 'OK'
     );
     echo json_encode($respData);
+}
+
+/**
+ * Finalizar pedido y registrar historial
+ */
+if (isset($_POST["accion"]) && $_POST["accion"] == "finalizarPedido") {
+    $tokenCliente = isset($_POST['tokenCliente']) ? $_POST['tokenCliente'] : '';
+
+    $tablaPedidos = mysqli_query($con, "SHOW TABLES LIKE 'pedidos'");
+    $tablaDetalle = mysqli_query($con, "SHOW TABLES LIKE 'pedidos_detalle'");
+    if (!($tablaPedidos && mysqli_num_rows($tablaPedidos) > 0) || !($tablaDetalle && mysqli_num_rows($tablaDetalle) > 0)) {
+        echo json_encode(['estado' => 'ERROR', 'mensaje' => 'Falta crear las tablas de pedidos.']);
+        exit;
+    }
+
+    $filtro = filtro_carrito_api($con, $tokenCliente, $sessionUserId);
+    if (!$filtro) {
+        echo json_encode(['estado' => 'ERROR', 'mensaje' => 'No hay carrito activo.']);
+        exit;
+    }
+    $where = $filtro['field'] === 'user_id'
+        ? "pt.user_id = " . (int)$filtro['value']
+        : "pt.tokenCliente = '" . mysqli_real_escape_string($con, $filtro['value']) . "'";
+
+    $sqlItems = "SELECT pt.producto_id, pt.cantidad, p.precio FROM pedidostemporales AS pt INNER JOIN products AS p ON pt.producto_id = p.id WHERE " . $where;
+    $itemsResult = mysqli_query($con, $sqlItems);
+    if (!$itemsResult || mysqli_num_rows($itemsResult) === 0) {
+        echo json_encode(['estado' => 'ERROR', 'mensaje' => 'El carrito está vacío.']);
+        exit;
+    }
+
+    $items = [];
+    $total = 0;
+    while ($row = mysqli_fetch_assoc($itemsResult)) {
+        $items[] = $row;
+        $total += ((int)$row['cantidad']) * ((float)$row['precio']);
+    }
+
+    mysqli_begin_transaction($con);
+    try {
+        if ($filtro['field'] === 'user_id') {
+            $sqlPedido = "INSERT INTO pedidos (user_id, total) VALUES (" . (int)$filtro['value'] . ", " . $total . ")";
+        } else {
+            $sqlPedido = "INSERT INTO pedidos (tokenCliente, total) VALUES ('" . mysqli_real_escape_string($con, $filtro['value']) . "', " . $total . ")";
+        }
+
+        $okPedido = mysqli_query($con, $sqlPedido);
+        if (!$okPedido) {
+            throw new Exception('No se pudo crear el pedido.');
+        }
+        $pedidoId = mysqli_insert_id($con);
+
+        foreach ($items as $item) {
+            $sqlDetalle = "INSERT INTO pedidos_detalle (pedido_id, producto_id, cantidad, precio) VALUES (" . (int)$pedidoId . ", " . (int)$item['producto_id'] . ", " . (int)$item['cantidad'] . ", " . (float)$item['precio'] . ")";
+            $okDetalle = mysqli_query($con, $sqlDetalle);
+            if (!$okDetalle) {
+                throw new Exception('No se pudo registrar el detalle.');
+            }
+        }
+
+        mysqli_commit($con);
+        echo json_encode(['estado' => 'OK', 'pedidoId' => $pedidoId]);
+    } catch (Exception $e) {
+        mysqli_rollback($con);
+        echo json_encode(['estado' => 'ERROR', 'mensaje' => $e->getMessage()]);
+    }
 }
 
 /**

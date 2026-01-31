@@ -5,23 +5,23 @@ date_default_timezone_set('America/Bogota');
 
 $codPedido = isset($_POST['codPedido']) ? $_POST['codPedido'] : (isset($_GET['codPedido']) ? $_GET['codPedido'] : '');
 $userId = isset($_POST['userId']) ? (int)$_POST['userId'] : (isset($_GET['userId']) ? (int)$_GET['userId'] : 0);
-$token = $codPedido !== '' ? substr($codPedido, 0, 5) : '';
+$pedidoId = isset($_POST['pedidoId']) ? (int)$_POST['pedidoId'] : (isset($_GET['pedidoId']) ? (int)$_GET['pedidoId'] : 0);
+$token = $pedidoId > 0 ? ('PED' . $pedidoId) : ($codPedido !== '' ? substr($codPedido, 0, 5) : '');
 
 
 ob_end_clean(); //limpiar la memoria
 
 
 //SQL para buscar información adicional del pedido
-$wherePedido = $userId > 0
-    ? "user_id = " . $userId
-    : "tokenCliente = '" . mysqli_real_escape_string($con, $codPedido) . "'";
+$wherePedido = $pedidoId > 0
+    ? "id = " . $pedidoId
+    : ($userId > 0
+        ? "user_id = " . $userId
+        : "tokenCliente = '" . mysqli_real_escape_string($con, $codPedido) . "'");
 
-$infoPedido = "
-SELECT 
-    MAX(DATE_FORMAT(fecha, '%d de %b %Y')) AS fecha_pedido,
-    MAX(DATE_FORMAT(fecha, '%h:%i %p')) AS hora_fecha_pedido
-FROM pedidostemporales
-WHERE " . $wherePedido . " LIMIT 1";
+$infoPedido = $pedidoId > 0
+    ? "SELECT DATE_FORMAT(created_at, '%d de %b %Y') AS fecha_pedido, DATE_FORMAT(created_at, '%h:%i %p') AS hora_fecha_pedido FROM pedidos WHERE " . $wherePedido . " LIMIT 1"
+    : "SELECT MAX(DATE_FORMAT(fecha, '%d de %b %Y')) AS fecha_pedido, MAX(DATE_FORMAT(fecha, '%h:%i %p')) AS hora_fecha_pedido FROM pedidostemporales WHERE " . $wherePedido . " LIMIT 1";
 $queryPedido = mysqli_query($con, $infoPedido);
 $data = mysqli_fetch_array($queryPedido);
 
@@ -92,7 +92,22 @@ $html1 .= '
 $pdf->writeHTML($html1);
 */
 
-$sqlCarritoCompra = ("
+$sqlCarritoCompra = $pedidoId > 0
+    ? ("
+        SELECT 
+            p.nameProd,
+            d.precio,
+            d.cantidad,
+            d.precio * d.cantidad AS total_a_pagar
+        FROM 
+            pedidos_detalle AS d
+        INNER JOIN
+            products AS p
+        ON 
+            p.id = d.producto_id
+        WHERE 
+            d.pedido_id = " . $pedidoId)
+    : ("
         SELECT 
             p.nameProd,
             p.precio,

@@ -6,9 +6,20 @@ header('Content-Type: application/json');
 
 $sessionUserId = isset($_SESSION['user']) && !empty($_SESSION['user']['id']) ? (int)$_SESSION['user']['id'] : null;
 
+function tiene_columna_user_id($con)
+{
+    static $hasUserId = null;
+    if ($hasUserId !== null) {
+        return $hasUserId;
+    }
+    $result = mysqli_query($con, "SHOW COLUMNS FROM pedidostemporales LIKE 'user_id'");
+    $hasUserId = $result && mysqli_num_rows($result) > 0;
+    return $hasUserId;
+}
+
 function filtro_carrito_api($con, $tokenCliente, $sessionUserId)
 {
-    if ($sessionUserId) {
+    if ($sessionUserId && tiene_columna_user_id($con)) {
         return ['field' => 'user_id', 'value' => (int)$sessionUserId];
     }
     if ($tokenCliente !== null && $tokenCliente !== '') {

@@ -1,9 +1,20 @@
 <?php
 include('config/config.php');
 
+function tiene_columna_user_id($con)
+{
+    static $hasUserId = null;
+    if ($hasUserId !== null) {
+        return $hasUserId;
+    }
+    $result = mysqli_query($con, "SHOW COLUMNS FROM pedidostemporales LIKE 'user_id'");
+    $hasUserId = $result && mysqli_num_rows($result) > 0;
+    return $hasUserId;
+}
+
 function obtener_filtro_carrito($con)
 {
-    if (isset($_SESSION['user']) && !empty($_SESSION['user']['id'])) {
+    if (tiene_columna_user_id($con) && isset($_SESSION['user']) && !empty($_SESSION['user']['id'])) {
         return ['field' => 'user_id', 'value' => (int)$_SESSION['user']['id']];
     }
 

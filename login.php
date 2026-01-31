@@ -15,7 +15,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $usuario = autenticar_usuario($con, $email, $password);
         if ($usuario) {
             $_SESSION['user'] = $usuario;
-            if (isset($_SESSION['tokenStoragel']) && $_SESSION['tokenStoragel'] !== '') {
+            $colUserId = mysqli_query($con, "SHOW COLUMNS FROM pedidostemporales LIKE 'user_id'");
+            $hasUserId = $colUserId && mysqli_num_rows($colUserId) > 0;
+            if ($hasUserId && isset($_SESSION['tokenStoragel']) && $_SESSION['tokenStoragel'] !== '') {
                 $token = mysqli_real_escape_string($con, $_SESSION['tokenStoragel']);
                 $userId = (int)$usuario['id'];
                 mysqli_query($con, "UPDATE pedidostemporales SET user_id = " . $userId . " WHERE tokenCliente = '" . $token . "'");

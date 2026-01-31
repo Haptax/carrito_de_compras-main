@@ -106,7 +106,7 @@ $sqlCarritoCompra = $pedidoId > 0
         ON 
             p.id = d.producto_id
         WHERE 
-            d.pedido_id = " . $pedidoId)
+            d.pedido_id = " . $pedidoId . "")
     : ("
         SELECT 
             p.nameProd,
@@ -120,7 +120,7 @@ $sqlCarritoCompra = $pedidoId > 0
         ON 
             p.id = pedtemp.producto_id
         WHERE 
-            " . $wherePedido . ");
+            " . $wherePedido . "");
 $queryCarrito   = mysqli_query($con, $sqlCarritoCompra);
 
 

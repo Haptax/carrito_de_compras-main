@@ -3,20 +3,25 @@ require_once('tcpdf/tcpdf.php');
 include('config/config.php');
 date_default_timezone_set('America/Bogota');
 
-$codPedido = isset($_POST['codPedido']) ? $_POST['codPedido'] : $_GET['codPedido'];
-$token = substr($codPedido, 0, 5);
+$codPedido = isset($_POST['codPedido']) ? $_POST['codPedido'] : (isset($_GET['codPedido']) ? $_GET['codPedido'] : '');
+$userId = isset($_POST['userId']) ? (int)$_POST['userId'] : (isset($_GET['userId']) ? (int)$_GET['userId'] : 0);
+$token = $codPedido !== '' ? substr($codPedido, 0, 5) : '';
 
 
 ob_end_clean(); //limpiar la memoria
 
 
 //SQL para buscar información adicional del pedido
+$wherePedido = $userId > 0
+    ? "user_id = " . $userId
+    : "tokenCliente = '" . mysqli_real_escape_string($con, $codPedido) . "'";
+
 $infoPedido = "
 SELECT 
     MAX(DATE_FORMAT(fecha, '%d de %b %Y')) AS fecha_pedido,
     MAX(DATE_FORMAT(fecha, '%h:%i %p')) AS hora_fecha_pedido
 FROM pedidostemporales
-WHERE tokenCliente = '" . $codPedido . "' LIMIT 1";
+WHERE " . $wherePedido . " LIMIT 1";
 $queryPedido = mysqli_query($con, $infoPedido);
 $data = mysqli_fetch_array($queryPedido);
 
@@ -100,7 +105,7 @@ $sqlCarritoCompra = ("
         ON 
             p.id = pedtemp.producto_id
         WHERE 
-            pedtemp.tokenCliente = '" . $codPedido . "'");
+            " . $wherePedido . ");
 $queryCarrito   = mysqli_query($con, $sqlCarritoCompra);
 
 

@@ -1,6 +1,18 @@
 <?php
-session_start();
 include('config/config.php');
+
+function obtener_filtro_carrito($con)
+{
+    if (isset($_SESSION['user']) && !empty($_SESSION['user']['id'])) {
+        return ['field' => 'user_id', 'value' => (int)$_SESSION['user']['id']];
+    }
+
+    if (isset($_SESSION['tokenStoragel']) && $_SESSION['tokenStoragel'] !== '') {
+        return ['field' => 'tokenCliente', 'value' => mysqli_real_escape_string($con, $_SESSION['tokenStoragel'])];
+    }
+
+    return null;
+}
 
 /**
  * Funcion para obtener todos los productos
@@ -66,7 +78,7 @@ function detalles_producto_seleccionado($con, $idProd)
  */
 function validando_carrito()
 {
-    if (isset($_SESSION['tokenStoragel']) == "") {
+    if (!obtener_filtro_carrito($GLOBALS['con'])) {
         return '
             <div class="row align-items-center">
                 <div class="col-lg-12 text-center mt-5">
@@ -91,7 +103,11 @@ function validando_carrito()
  */
 function mi_carrito_de_compra($con)
 {
-    if (isset($_SESSION['tokenStoragel']) != "") {
+    $filtro = obtener_filtro_carrito($con);
+    if ($filtro) {
+        $where = $filtro['field'] === 'user_id'
+            ? "pt.user_id = " . (int)$filtro['value']
+            : "pt.tokenCliente = '" . $filtro['value'] . "'";
         $sqlCarritoCompra = ("
                 SELECT 
                     p.id AS prodId,
@@ -110,7 +126,7 @@ function mi_carrito_de_compra($con)
                 INNER JOIN
                     pedidostemporales AS pt ON p.id = pt.producto_id
                 WHERE 
-                    pt.tokenCliente = '" . $_SESSION['tokenStoragel'] . "'");
+                    " . $where . ");
         $queryCarrito   = mysqli_query($con, $sqlCarritoCompra);
         if (!$queryCarrito) {
             return false;
@@ -127,8 +143,12 @@ function mi_carrito_de_compra($con)
  */
 function iconoCarrito($con)
 {
-    if (isset($_SESSION['tokenStoragel']) && $_SESSION['tokenStoragel'] !== "") {
-        $sqlTotalProduct = "SELECT SUM(cantidad) AS totalProd FROM pedidostemporales WHERE tokenCliente='" . $_SESSION['tokenStoragel'] . "' GROUP BY tokenCliente";
+    $filtro = obtener_filtro_carrito($con);
+    if ($filtro) {
+        $where = $filtro['field'] === 'user_id'
+            ? "user_id = " . (int)$filtro['value']
+            : "tokenCliente = '" . $filtro['value'] . "'";
+        $sqlTotalProduct = "SELECT SUM(cantidad) AS totalProd FROM pedidostemporales WHERE " . $where . " GROUP BY " . $filtro['field'];
         $jqueryTotalProduct = mysqli_query($con, $sqlTotalProduct);
 
         if ($jqueryTotalProduct) {
@@ -145,13 +165,17 @@ function iconoCarrito($con)
 
 function totalAcumuladoDeuda($con)
 {
-    if (isset($_SESSION['tokenStoragel']) != "") {
+    $filtro = obtener_filtro_carrito($con);
+    if ($filtro) {
+        $where = $filtro['field'] === 'user_id'
+            ? "pt.user_id = " . (int)$filtro['value']
+            : "pt.tokenCliente = '" . $filtro['value'] . "'";
         $SqlDeudaTotal = "
         SELECT SUM(p.precio * pt.cantidad) AS totalPagar 
         FROM products AS p
         INNER JOIN pedidostemporales AS pt
         ON p.id = pt.producto_id
-        WHERE pt.tokenCliente = '" . $_SESSION["tokenStoragel"] . "'
+        WHERE " . $where . "
         ";
         $jqueryDeuda = mysqli_query($con, $SqlDeudaTotal);
         $dataDeuda = mysqli_fetch_array($jqueryDeuda);

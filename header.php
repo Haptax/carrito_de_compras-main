@@ -1,3 +1,6 @@
+<?php
+$usuarioActual = isset($_SESSION['user']) ? $_SESSION['user'] : null;
+?>
 <header class="header trans_300">
 	<div class="top_nav">
 		<div class="container">
@@ -5,7 +8,14 @@
 				<div class="col-md-12">
 					<div class="top_nav_left text-right" style="line-height: 30px !important;">
 						<i class="fa fa-user" aria-hidden="true"></i>
-						<a href="#" id="mi_cuenta">Mi Cuenta</a>
+						<?php if ($usuarioActual) { ?>
+							<span>Hola, <?php echo htmlspecialchars($usuarioActual['nombre']); ?></span>
+							<a href="logout.php" class="ml-2">Cerrar Sesión</a>
+						<?php } else { ?>
+							<a href="login.php" id="mi_cuenta">Iniciar Sesión</a>
+							<span class="ml-2">|</span>
+							<a href="registro.php" class="ml-2">Registrarme</a>
+						<?php } ?>
 					</div>
 				</div>
 			</div>
@@ -58,8 +68,13 @@
 					<i class="fa fa-angle-down"></i>
 				</a>
 				<ul class="menu_selection">
-					<li><a href="#">Urian Viera</a></li>
-					<li><a href="#">Cerrar Sesión</a></li>
+					<?php if ($usuarioActual) { ?>
+						<li><a href="#">Hola, <?php echo htmlspecialchars($usuarioActual['nombre']); ?></a></li>
+						<li><a href="logout.php">Cerrar Sesión</a></li>
+					<?php } else { ?>
+						<li><a href="login.php">Iniciar Sesión</a></li>
+						<li><a href="registro.php">Registrarme</a></li>
+					<?php } ?>
 				</ul>
 			</li>
 			<li class="menu_item"><a href="./">Inicio</a></li>

@@ -1,3 +1,6 @@
+<?php
+session_start();
+?>
 <!DOCTYPE html>
 <html lang="es">
 
@@ -105,7 +108,12 @@
                                 </a>
                             </div>
                             <div class="col-md-6">
-                                <button class="btn btn-block btn-success" onclick="solictarPedido('<?php echo $_SESSION['tokenStoragel']; ?>')">
+                                <?php
+                                $codPedido = isset($_SESSION['user']) && !empty($_SESSION['user']['id'])
+                                    ? $_SESSION['user']['id']
+                                    : (isset($_SESSION['tokenStoragel']) ? $_SESSION['tokenStoragel'] : '');
+                                ?>
+                                <button class="btn btn-block btn-success" onclick="solictarPedido('<?php echo $codPedido; ?>')">
                                     Solicitar Pedido
                                     <i class="bi bi-arrow-right-circle"></i>
                                 </button>

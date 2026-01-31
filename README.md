@@ -38,6 +38,18 @@
     Cambia los datos de conexión en el archivo config.php
     Ingresa desde un navegador a http://localhost/nombre_de_la_carpeta_del_proyecto
 
+### Registro e inicio de sesión 🔐
+
+Se agregó soporte para crear cuentas e iniciar sesión. El esquema incluye la tabla `users` en el archivo SQL.
+
+Rutas nuevas:
+
+    /registro.php
+    /login.php
+    /logout.php
+
+Si usas Railway, ejecuta el contenido actualizado de `BD/bd_tienda_online.sql` en tu base de datos y asegúrate de tener las variables de entorno DB_HOST, DB_USER, DB_PASS, DB_NAME y DB_PORT configuradas.
+
 ### Expresiones de Gratitud 🎁
 
     ¡Comparte este emocionante proyecto con los demás! 📢

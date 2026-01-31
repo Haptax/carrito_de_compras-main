@@ -176,8 +176,10 @@ function formatearCantidad(cantidad) {
 const solictarPedido = (codPedido) => {
   const whatsappAPI = "https://api.whatsapp.com/send?phone=";
   const phoneNumber = "+57xxxxxxxxxx";
-
-  const link = `http://localhost/tienda-online/pdfPedido.php?codPedido=${codPedido}`;
+  const esUserId = /^[0-9]+$/.test(codPedido);
+  const link = esUserId
+    ? `http://localhost/tienda-online/pdfPedido.php?userId=${codPedido}`
+    : `http://localhost/tienda-online/pdfPedido.php?codPedido=${codPedido}`;
   const message = `¡Hola! Me interesa el siguiente pedido: ${link}`;
   const whatsappURL = `${whatsappAPI}${phoneNumber}&text=${message}`;
 
@@ -189,7 +191,11 @@ const solictarPedido = (codPedido) => {
  * Funcion para limpiar todo mi carrito
  */
 function clearCart() {
-  let dataString = `accion=limpiarTodoElCarrito`;
+  let tokenCliente = "";
+  if ("miProducto" in localStorage) {
+    tokenCliente = localStorage.getItem("miProducto");
+  }
+  let dataString = `accion=limpiarTodoElCarrito&tokenCliente=${tokenCliente}`;
   axios
     .post(ruta, dataString)
     .then(function (response) {

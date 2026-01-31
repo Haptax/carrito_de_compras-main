@@ -4,6 +4,19 @@ include('../config/config.php');
 // Establecer las cabeceras para indicar que la respuesta es en formato JSON
 header('Content-Type: application/json');
 
+$sessionUserId = isset($_SESSION['user']) && !empty($_SESSION['user']['id']) ? (int)$_SESSION['user']['id'] : null;
+
+function filtro_carrito_api($con, $tokenCliente, $sessionUserId)
+{
+    if ($sessionUserId) {
+        return ['field' => 'user_id', 'value' => (int)$sessionUserId];
+    }
+    if ($tokenCliente !== null && $tokenCliente !== '') {
+        return ['field' => 'tokenCliente', 'value' => mysqli_real_escape_string($con, $tokenCliente)];
+    }
+    return null;
+}
+
 
 if (isset($_POST["aumentarCantidad"])) {
     $idProd               = $_POST['idProd'];
@@ -11,15 +24,24 @@ if (isset($_POST["aumentarCantidad"])) {
     $tokenCliente         = $_POST['tokenCliente'];
     $cantidaProducto      = $_POST['aumentarCantidad'];
 
+    $filtro = filtro_carrito_api($con, $tokenCliente, $sessionUserId);
+    if (!$filtro) {
+        echo json_encode(['estado' => 'ERROR']);
+        exit;
+    }
+    $where = $filtro && $filtro['field'] === 'user_id'
+        ? "user_id = " . (int)$filtro['value']
+        : "tokenCliente = '" . $filtro['value'] . "'";
+
     $UpdateCant = "UPDATE pedidostemporales 
               SET cantidad ='$cantidaProducto'
-              WHERE tokenCliente='$tokenCliente'
+              WHERE " . $where . "
               AND id='$idProd'";
     $result = mysqli_query($con, $UpdateCant);
 
     $responseData = array(
         'estado' => 'OK',
-        'totalPagar' => totalAccionAumentarDisminuir($con, $tokenCliente)
+        'totalPagar' => totalAccionAumentarDisminuir($con, $filtro)
     );
     // Enviar la respuesta JSON
     echo json_encode($responseData);
@@ -31,29 +53,40 @@ if (isset($_POST["aumentarCantidad"])) {
  * Agregar a carrito de compra el producto
  */
 if (isset($_POST["accion"]) && $_POST["accion"] == "addCar") {
-    $_SESSION['tokenStoragel']  = $_POST['tokenCliente'];
+    if (!$sessionUserId) {
+        $_SESSION['tokenStoragel']  = $_POST['tokenCliente'];
+    }
     $idProduct                  = $_POST['idProduct'];
     $precio                     = $_POST['precio'];
     $tokenCliente               = $_POST['tokenCliente'];
 
+    $filtro = filtro_carrito_api($con, $tokenCliente, $sessionUserId);
+    $where = $filtro && $filtro['field'] === 'user_id'
+        ? "user_id = " . (int)$filtro['value']
+        : "tokenCliente = '" . $filtro['value'] . "'";
+
     //Verifico si ya existe el producto almacenado en la tabla temporal de acuerdo al Token Unico del Cliente
-    $ConsultarProduct = ("SELECT * FROM pedidostemporales WHERE tokenCliente='" . $tokenCliente . "' AND producto_id='" . $idProduct . "' ");
+    $ConsultarProduct = ("SELECT * FROM pedidostemporales WHERE " . $where . " AND producto_id='" . $idProduct . "' ");
     $jqueryProduct    = mysqli_query($con, $ConsultarProduct);
     //Caso 1; si ya existe dicho producto agregado con respecto al token que tiene asignado el Cliente.
     if (mysqli_num_rows($jqueryProduct) > 0) {
         $DataProducto     = mysqli_fetch_array($jqueryProduct);
         $newCantidad   = ($DataProducto['cantidad'] + 1);
 
-        $UdateCantidad = ("UPDATE pedidostemporales SET cantidad='" . $newCantidad . "' WHERE producto_id='" . $idProduct . "' AND tokenCliente='" . $tokenCliente . "' ");
+        $UdateCantidad = ("UPDATE pedidostemporales SET cantidad='" . $newCantidad . "' WHERE producto_id='" . $idProduct . "' AND " . $where . " ");
         $resultUpdat = mysqli_query($con, $UdateCantidad);
     } else {
         //Caso 2; No existe producto agregado en la tabla de pedidos
-        $InsertProduct = ("INSERT INTO pedidostemporales (producto_id, cantidad, tokenCliente) VALUES ('$idProduct','1','$tokenCliente')");
+        if ($filtro && $filtro['field'] === 'user_id') {
+            $InsertProduct = ("INSERT INTO pedidostemporales (producto_id, cantidad, user_id) VALUES ('$idProduct','1','" . (int)$filtro['value'] . "')");
+        } else {
+            $InsertProduct = ("INSERT INTO pedidostemporales (producto_id, cantidad, tokenCliente) VALUES ('$idProduct','1','$tokenCliente')");
+        }
         $result = mysqli_query($con, $InsertProduct);
     }
 
     //Total carrito en el icono de compra
-    $SqlTotalProduct       = ("SELECT SUM(cantidad) AS totalProd FROM pedidostemporales WHERE tokenCliente='" . $_SESSION['tokenStoragel'] . "' GROUP BY tokenCliente");
+    $SqlTotalProduct       = ("SELECT SUM(cantidad) AS totalProd FROM pedidostemporales WHERE " . $where . " GROUP BY " . $filtro['field'] . ");
     $jqueryTotalProduct    = mysqli_query($con, $SqlTotalProduct);
     $DataTotalProducto     = mysqli_fetch_array($jqueryTotalProduct);
     echo $DataTotalProducto['totalProd'];
@@ -64,31 +97,38 @@ if (isset($_POST["accion"]) && $_POST["accion"] == "addCar") {
  */
 if (isset($_POST["accion"]) && $_POST["accion"] == "disminuirCantidad") {
 
-    $_SESSION['tokenStoragel']  = $_POST['tokenCliente'];
+    if (!$sessionUserId) {
+        $_SESSION['tokenStoragel']  = $_POST['tokenCliente'];
+    }
     // Evitar posibles ataques de inyección SQL escapando las variables
     $idProd                     = mysqli_real_escape_string($con, $_POST['idProd']);
     $precio                     = mysqli_real_escape_string($con, $_POST['precio']);
     $tokenCliente               = mysqli_real_escape_string($con, $_POST['tokenCliente']);
     $cantidad_Disminuida        = mysqli_real_escape_string($con, $_POST['cantidad_Disminuida']);
 
+    $filtro = filtro_carrito_api($con, $tokenCliente, $sessionUserId);
+    $where = $filtro && $filtro['field'] === 'user_id'
+        ? "user_id = " . (int)$filtro['value']
+        : "tokenCliente = '" . $filtro['value'] . "'";
+
     if ($cantidad_Disminuida == 0) {
-        $DeleteRegistro = ("DELETE FROM pedidostemporales WHERE tokenCliente='" . $tokenCliente . "' AND id='" . $idProd . "' ");
+        $DeleteRegistro = ("DELETE FROM pedidostemporales WHERE " . $where . " AND id='" . $idProd . "' ");
         mysqli_query($con, $DeleteRegistro);
         $responseData = array(
-            'totalProductos' => totalProductosSeleccionados($con, $tokenCliente),
-            'totalPagar' => totalAccionAumentarDisminuir($con, $tokenCliente),
+            'totalProductos' => totalProductosSeleccionados($con, $filtro),
+            'totalPagar' => totalAccionAumentarDisminuir($con, $filtro),
             'estado' => 'OK'
         );
     } else {
         $UpdateCant = ("UPDATE pedidostemporales 
     SET cantidad ='$cantidad_Disminuida'
-    WHERE tokenCliente='" . $tokenCliente . "' 
+    WHERE " . $where . " 
     AND id='" . $idProd . "' ");
         $result = mysqli_query($con, $UpdateCant);
 
         $responseData = array(
-            'totalProductos' => totalProductosSeleccionados($con, $tokenCliente),
-            'totalPagar' => totalAccionAumentarDisminuir($con, $tokenCliente),
+            'totalProductos' => totalProductosSeleccionados($con, $filtro),
+            'totalPagar' => totalAccionAumentarDisminuir($con, $filtro),
             'estado' => 'OK'
         );
     }
@@ -104,13 +144,18 @@ if (isset($_POST["accion"]) && $_POST["accion"] == "disminuirCantidad") {
 if (isset($_POST["accion"]) && $_POST["accion"] == "borrarproductoModal") {
     $nameTokenProducto  = $_POST['tokenCliente'];
 
-    $DeleteRegistro = ("DELETE FROM pedidostemporales WHERE id= '" . $_POST["idProduct"] . "' ");
+    $filtro = filtro_carrito_api($con, $nameTokenProducto, $sessionUserId);
+    $where = $filtro && $filtro['field'] === 'user_id'
+        ? "user_id = " . (int)$filtro['value']
+        : "tokenCliente = '" . $filtro['value'] . "'";
+
+    $DeleteRegistro = ("DELETE FROM pedidostemporales WHERE " . $where . " AND id= '" . $_POST["idProduct"] . "' ");
     mysqli_query($con, $DeleteRegistro);
 
     $respData = array(
-        'totalProductos' => totalProductosSeleccionados($con, $nameTokenProducto),
-        'totalProductoSeleccionados' => totalProductosBD($con, $nameTokenProducto),
-        'totalPagar' => totalAccionAumentarDisminuir($con, $nameTokenProducto),
+        'totalProductos' => totalProductosSeleccionados($con, $filtro),
+        'totalProductoSeleccionados' => totalProductosBD($con, $filtro),
+        'totalPagar' => totalAccionAumentarDisminuir($con, $filtro),
         'estado' => 'OK'
     );
     echo json_encode($respData);
@@ -119,9 +164,15 @@ if (isset($_POST["accion"]) && $_POST["accion"] == "borrarproductoModal") {
 /**
  * Total productos en mi carrito de compra
  */
-function totalProductosBD($con, $nameTokenProducto)
+function totalProductosBD($con, $filtro)
 {
-    $sqlTotalProduct = "SELECT SUM(cantidad) AS totalProd FROM pedidostemporales WHERE tokenCliente='" . $nameTokenProducto . "' GROUP BY tokenCliente";
+    if (!$filtro) {
+        return 0;
+    }
+    $where = $filtro['field'] === 'user_id'
+        ? "user_id = " . (int)$filtro['value']
+        : "tokenCliente = '" . $filtro['value'] . "'";
+    $sqlTotalProduct = "SELECT SUM(cantidad) AS totalProd FROM pedidostemporales WHERE " . $where . " GROUP BY " . $filtro['field'];
     $jqueryTotalProduct = mysqli_query($con, $sqlTotalProduct);
     if ($jqueryTotalProduct) {
         $dataTotalProducto = mysqli_fetch_array($jqueryTotalProduct);
@@ -131,14 +182,20 @@ function totalProductosBD($con, $nameTokenProducto)
     }
 }
 
-function totalAccionAumentarDisminuir($con, $tokenCliente)
+function totalAccionAumentarDisminuir($con, $filtro)
 {
+    if (!$filtro) {
+        return 0;
+    }
+    $where = $filtro['field'] === 'user_id'
+        ? "pt.user_id = " . (int)$filtro['value']
+        : "pt.tokenCliente = '" . $filtro['value'] . "'";
     $SqlDeudaTotal = "
         SELECT SUM(p.precio * pt.cantidad) AS totalPagar 
         FROM products AS p
         INNER JOIN pedidostemporales AS pt
         ON p.id = pt.producto_id
-        WHERE pt.tokenCliente = '" .  $tokenCliente . "'";
+        WHERE " .  $where . "";
     $jqueryDeuda = mysqli_query($con, $SqlDeudaTotal);
     $dataDeuda = mysqli_fetch_array($jqueryDeuda);
     return $dataDeuda['totalPagar'];
@@ -147,9 +204,15 @@ function totalAccionAumentarDisminuir($con, $tokenCliente)
 /**
  * Funcion que esta al pendiente de verificar si hay pedidos activos por el usuario en cuestión
  */
-function totalProductosSeleccionados($con, $tokenCliente)
+function totalProductosSeleccionados($con, $filtro)
 {
-    $ConsultarProduct = ("SELECT * FROM pedidostemporales WHERE tokenCliente='" . $tokenCliente . "' ");
+    if (!$filtro) {
+        return 0;
+    }
+    $where = $filtro['field'] === 'user_id'
+        ? "user_id = " . (int)$filtro['value']
+        : "tokenCliente = '" . $filtro['value'] . "'";
+    $ConsultarProduct = ("SELECT * FROM pedidostemporales WHERE " . $where . " ");
     $jqueryProduct    = mysqli_query($con, $ConsultarProduct);
     if (mysqli_num_rows($jqueryProduct) > 0) {
         return mysqli_num_rows($jqueryProduct);
@@ -162,14 +225,18 @@ function totalProductosSeleccionados($con, $tokenCliente)
  * funcion limpiar carrito
  */
 if (isset($_POST["accion"]) && $_POST["accion"] == "limpiarTodoElCarrito") {
-    // Cerrar todas las variables de sesión
-    session_unset();
+    $tokenCliente = isset($_POST['tokenCliente']) ? $_POST['tokenCliente'] : '';
+    $filtro = filtro_carrito_api($con, $tokenCliente, $sessionUserId);
+    if ($filtro) {
+        $where = $filtro['field'] === 'user_id'
+            ? "user_id = " . (int)$filtro['value']
+            : "tokenCliente = '" . $filtro['value'] . "'";
+        mysqli_query($con, "DELETE FROM pedidostemporales WHERE " . $where);
+    }
 
-    // Destruir la sesión
-    session_destroy();
-
-    // Cerrar una variable de sesión específica
-    // unset($_SESSION['tokenStoragel']);
+    if (!$sessionUserId) {
+        unset($_SESSION['tokenStoragel']);
+    }
 
     echo json_encode(['mensaje' => 1]);
 }

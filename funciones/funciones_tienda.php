@@ -126,7 +126,7 @@ function mi_carrito_de_compra($con)
                 INNER JOIN
                     pedidostemporales AS pt ON p.id = pt.producto_id
                 WHERE 
-                    " . $where . ");
+                    " . $where . "");
         $queryCarrito   = mysqli_query($con, $sqlCarritoCompra);
         if (!$queryCarrito) {
             return false;

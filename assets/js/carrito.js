@@ -174,9 +174,6 @@ function formatearCantidad(cantidad) {
  * Funcion que recibe la solicitud para gestionar el pedido
  */
 const solictarPedido = (codPedido) => {
-  const whatsappAPI = "https://api.whatsapp.com/send?phone=";
-  const phoneNumber = "+57xxxxxxxxxx";
-
   let tokenCliente = "";
   if ("miProducto" in localStorage) {
     tokenCliente = localStorage.getItem("miProducto");
@@ -187,27 +184,14 @@ const solictarPedido = (codPedido) => {
   axios
     .post(ruta, dataString)
     .then((response) => {
-      let link = "";
       if (response.data && response.data.estado === "OK") {
-        link = `${window.location.origin}/pdfPedido.php?pedidoId=${response.data.pedidoId}`;
-      } else {
-        const esUserId = /^[0-9]+$/.test(codPedido);
-        link = esUserId
-          ? `${window.location.origin}/pdfPedido.php?userId=${codPedido}`
-          : `${window.location.origin}/pdfPedido.php?codPedido=${codPedido}`;
+        window.location.href = `${window.location.origin}/pdfPedido.php?pedidoId=${response.data.pedidoId}`;
+        return;
       }
-      const message = `¡Hola! Me interesa el siguiente pedido: ${link}`;
-      const whatsappURL = `${whatsappAPI}${phoneNumber}&text=${message}`;
-      window.open(whatsappURL, "_blank");
+      alert("No se pudo registrar el pedido.");
     })
     .catch(() => {
-      const esUserId = /^[0-9]+$/.test(codPedido);
-      const link = esUserId
-        ? `${window.location.origin}/pdfPedido.php?userId=${codPedido}`
-        : `${window.location.origin}/pdfPedido.php?codPedido=${codPedido}`;
-      const message = `¡Hola! Me interesa el siguiente pedido: ${link}`;
-      const whatsappURL = `${whatsappAPI}${phoneNumber}&text=${message}`;
-      window.open(whatsappURL, "_blank");
+      alert("No se pudo registrar el pedido.");
     });
 };
 

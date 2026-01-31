@@ -165,7 +165,8 @@ function iconoCarrito($con)
         if ($jqueryTotalProduct) {
             // La consulta se ejecutó correctamente
             $dataTotalProducto = mysqli_fetch_array($jqueryTotalProduct);
-            return '<span id="checkout_items" class="checkout_items">' . $dataTotalProducto["totalProd"] . '</span>';
+            $total = $dataTotalProducto && isset($dataTotalProducto["totalProd"]) ? $dataTotalProducto["totalProd"] : 0;
+            return '<span id="checkout_items" class="checkout_items">' . $total . '</span>';
         } else {
             return '<span id="checkout_items" class="checkout_items">0</span>';
         }
